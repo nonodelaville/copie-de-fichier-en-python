@@ -31,17 +31,15 @@ nom_fichier = client_socket.recv(1024).decode()
 
 taille_recue = client_socket.recv(1024)
 taille = int(taille_recue.decode())
-contenu = b''
 
 
-#reception de chaque bloc
+
+#reception et écriture de chaque bloc
 for i in range(taille):
-    b = client_socket.recv(1024)
-    contenu += b
+    b = client_socket.recv(65536)
+    with open(nom_fichier, "wb") as f:
+        f.write(b)
+    print(f"{nom_fichier} => "+str(i* 100/ taille )+ "%")
 
 client_socket.close()
-
-#ecriture du fichier
-with open(nom_fichier, "wb") as f:
-    f.write(contenu)
 print(f"\n{nom_fichier} reçu du server\n")
