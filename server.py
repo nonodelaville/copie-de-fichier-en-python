@@ -1,6 +1,7 @@
 import socket
 import os
 import sys
+import math
 
 class Server():
     def __init__(self):
@@ -26,21 +27,30 @@ class Server():
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #timeout pour les connections d'une seconde, permet d'arreter le server manuellement
         self.server_socket.settimeout(1.0)
-        self.contenu = []
 
-    def lire_fichier(self):
-        #vide le contenu precedent
-        self.contenu.clear()
-        #découpage du fichier en blocs de 1024 bytes
+    def taille_bloc_fichier(self):
+        #renvoie la taille dufichier en nombre de blocs de 65536 bytes
+        taille_bytes = os.path.getsize(self.nom_fichier)
+        self.taille = math.ceil(taille_bytes /65536) #on arrondit la division au nombre supérieur si elle ne tombe pas juste
+
+    def envoyer_fichier(self,conn, addr):
+        print(f"\nenvoi de {self.nom_fichier} vers {addr}\n")
+        #envoi du nom du fichier
+        conn.send(self.nom_fichier.encode())
+        
+        #envoi de la taille du fichier au client en nombre de blocs de 65536 bytes
+        self.taille_bloc_fichier()
+        conn.send(str(self.taille).encode())
+
+        #découpage du fichier en blocs de 65536 bytes
         try:
             with open(self.nom_fichier, 'rb') as f:
-                while (bloc := f.read(1024)):
-                    self.contenu.append(bloc)
+                while (bloc := f.read(65536)):
+                    #on envoie le fichier bloc par bloc
+                    conn.sendall(bloc)
         except FileNotFoundError:
             print(f"{self.nom_fichier} : fichier introuvable")
             sys.exit(1)
-        #On recupere la taille du fichier en nombre de blocs pour pouvoir l'envoyer au client
-        self.taille = str(len(self.contenu))
 
     def boucle_server(self):
         #lance le server
@@ -52,17 +62,9 @@ class Server():
                 try:
                     conn, addr = self.server_socket.accept()
                     print(f"{addr} connecté")
-                    #envoi du nom du fichier
-                    print(f"\nenvoi de {self.nom_fichier} vers {addr}\n")
-                    conn.send(self.nom_fichier.encode())
-                    #on recupere le contenu du fichier
-                    self.lire_fichier()
-                    #envoi de la taille du fichier au client en nombre de blocs de 1024 bytes
-                    conn.send(self.taille.encode())
-                    #envoi de chaque bloc un par un
-                    for b in self.contenu:
-                        conn.send(b)
-                        
+                    
+                    #envoi du fichier
+                    self.envoyer_fichier(conn, addr)  
 
                     conn.close()
                 except socket.timeout:
